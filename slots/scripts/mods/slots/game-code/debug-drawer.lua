@@ -2,9 +2,16 @@
 
 DebugDrawerRelease = class(DebugDrawerRelease)
 
-DebugDrawerRelease.init = function(self, line_object, mode)
-	self._line_object = line_object
-	self._mode = mode
+function DebugDrawerRelease:init(line_object, mode)
+    self._line_object = line_object
+    self._mode = mode
+
+    -- Debugging: Check the type of line_object
+    if type(line_object) ~= "userdata" then
+        mod:echo("Error: line_object is not userdata in DebugDrawerRelease:init")
+    else
+        mod:echo("DebugDrawerRelease:init line_object is userdata")
+    end
 end
 
 DebugDrawerRelease.reset = function(self)
@@ -211,18 +218,19 @@ DebugDrawerRelease.navigation_mesh_search = function(self, mesh)
 	NavigationMesh.visualize_last_search(mesh, self._line_object)
 end
 
-DebugDrawerRelease.update = function(self, world)
-	if script_data and script_data.disable_debug_draw then
-		self:reset()
+function DebugDrawerRelease:update(world)
+    -- Debugging: Check the type of self._line_object and world
+    if type(self._line_object) ~= "userdata" then
+        mod:echo("Error: self._line_object is not userdata in DebugDrawerRelease:update")
+        return
+    end
 
-		return
-	end
+    if type(world) ~= "userdata" then
+        mod:echo("Error: world is not userdata in DebugDrawerRelease:update")
+        return
+    end
 
-	LineObject.dispatch(world, self._line_object)
-
-	if self._mode == "immediate" then
-		self:reset()
-	end
+    LineObject.dispatch(self._line_object, world)
 end
 
 return DebugDrawerRelease
