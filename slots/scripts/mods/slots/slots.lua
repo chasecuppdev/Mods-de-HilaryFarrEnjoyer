@@ -1,5 +1,8 @@
 local mod = get_mod("slots")
 
+local AISlotUtils = require("scripts/entity_system/systems/ai/ai_slot_utils")
+local AIPlayerSlotExtension = require("scripts/entity_system/systems/ai/ai_player_slot_extension")
+
 local base_slot_settings = require("scripts/settings/slot_settings")
 local base_slot_templates = require("scripts/settings/slot_templates")
 
@@ -16,6 +19,23 @@ SlotTypeSettings = SlotTypeSettings or {}
 -- Merge custom settings with base settings
 table.merge_recursive(SlotSettings, custom_slot_settings)
 table.merge_recursive(SlotTypeSettings, custom_slot_templates)
+
+-- Debugging function to print variable values
+local function debug_variables(...)
+    local vars = {...}
+    for i, var in ipairs(vars) do
+        mod:echo(string.format("Variable %d: %s", i, tostring(var)))
+    end
+end
+
+-- Define echo_table if it's not already defined
+if not mod.echo_table then
+    function mod:echo_table(tbl)
+        for k, v in pairs(tbl) do
+            self:echo(string.format("%s: %s", tostring(k), tostring(v)))
+        end
+    end
+end
 
 -- Debug function to print table contents
 local function debug_print_table(tbl, name)
@@ -83,13 +103,6 @@ AISlotSystem2.extensions = {
 local function unit_alive(unit)
     return ALIVE[unit]
 end
-
--- Define SLOT_POSITION_CHECK_INDEX if it's not already defined
-SLOT_POSITION_CHECK_INDEX = SLOT_POSITION_CHECK_INDEX or {
-    CHECK_MIDDLE = 1,  -- This is an example, replace with actual values
-    CHECK_LEFT = 2,
-    CHECK_RIGHT = 3
-}
 
 local function custom_create_target_slots(self, unit, num_slots, slot_type, color)
     -- Ensure self.slots is initialized
@@ -164,6 +177,18 @@ mod:hook(AIPlayerSlotExtension, "get_reachable_slot_position_on_navmesh", functi
     local slot_position, original_position = func(self, slot, locomotion_ext, target_position, wanted_position, radians, distance, should_offset_slot, nav_world, traverse_logic, above, below)
     mod:echo(string.format("Slot position for slot type %s: %s", slot.type, tostring(slot_position)))
     return slot_position, original_position
+end)
+
+-- Hook into get_slot_position_on_navmesh_from_outside_target
+mod:hook(AIPlayerSlotExtension, "get_slot_position_on_navmesh_from_outside_target", function (func, target_position, slot_direction, _, distance, nav_world, above, below)
+    mod:echo(string.format("Calling get_slot_position_on_navmesh_from_outside_target with target_position: %s, slot_direction: %s, distance: %s, nav_world: %s, above: %s, below: %s",
+        tostring(target_position), tostring(slot_direction), tostring(distance), tostring(nav_world), tostring(above), tostring(below)))
+    
+    local position, original_position = func(target_position, slot_direction, _, distance, nav_world, above, below)
+    
+    mod:echo(string.format("Resulting position: %s", tostring(position)))
+    
+    return position, original_position
 end)
 
 -- Custom on_add_extension function
