@@ -160,6 +160,12 @@ mod:hook(AIPlayerSlotExtension, "_create_target_slots", function(func, self, ...
     return custom_create_target_slots(self, ...)
 end)
 
+mod:hook(AIPlayerSlotExtension, "get_reachable_slot_position_on_navmesh", function (func, self, slot, locomotion_ext, target_position, wanted_position, radians, distance, should_offset_slot, nav_world, traverse_logic, above, below)
+    local slot_position, original_position = func(self, slot, locomotion_ext, target_position, wanted_position, radians, distance, should_offset_slot, nav_world, traverse_logic, above, below)
+    mod:echo(string.format("Slot position for slot type %s: %s", slot.type, tostring(slot_position)))
+    return slot_position, original_position
+end)
+
 -- Custom on_add_extension function
 local function custom_on_add_extension(self, world, unit, extension_name, extension_init_data)
     local extension = {}
@@ -368,6 +374,15 @@ AISlotSystem2.init = function(self, context, system_name)
         end
     end
 end
+
+mod:hook_safe(AISlotSystem2, "init", function (self, context, system_name)
+    mod:echo("SlotSettings at AISlotSystem2.init contents:")
+    mod:echo_table(SlotSettings)
+    mod:echo("SlotTypeSettings at AISlotSystem2.init contents:")
+    mod:echo_table(SlotTypeSettings)
+    mod:echo(string.format("Initialized with %d normal slots, %d medium slots, %d large slots",
+        SlotSettings.normal.count, SlotSettings.medium.count, SlotSettings.large.count))
+end)
 
 -- Enable debug visualizer
 local enabled = false
