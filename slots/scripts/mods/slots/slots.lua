@@ -365,7 +365,8 @@ end
 
 -- Function to draw debug visuals for the AI slot system
 function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
-    local debug_drawer = DebugDrawerRelease:new(LineObject, "immediate")
+    local line_object = Debug.create_line_object("slots_debug_drawer")
+    local debug_drawer = DebugDrawerRelease:new(line_object, "immediate")
 
     for _, unit in ipairs(target_units) do
         local extension = unit_extension_data[unit]
@@ -379,7 +380,6 @@ function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
         end
     end
 
-    -- Ensure that Managers.state.debug._world is of the correct type
     if type(Managers.state.debug._world) ~= "userdata" then
         mod:echo("Error: Managers.state.debug._world is not userdata")
         return
