@@ -1,0 +1,11 @@
+mod = [
+	"slots"
+]
+
+package = [
+	"resource_packages/slots/slots"
+]
+
+lua = [
+	"scripts/mods/slots/*"
+]

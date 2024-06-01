@@ -1,0 +1,381 @@
+local mod = get_mod("slots")
+
+local base_slot_settings = require("scripts/settings/slot_settings")
+local base_slot_templates = require("scripts/settings/slot_templates")
+
+local custom_slot_settings = require("scripts/mods/slots/custom_slot_settings")
+local custom_slot_templates = require("scripts/mods/slots/custom_slot_templates")
+
+assert(type(custom_slot_settings) == "table", "Expected custom_slot_settings to be a table")
+assert(type(custom_slot_templates) == "table", "Expected custom_slot_templates to be a table")
+
+-- Initialize SlotSettings and SlotTypeSettings if they are not defined
+SlotSettings = SlotSettings or {}
+SlotTypeSettings = SlotTypeSettings or {}
+
+-- Merge custom settings with base settings
+table.merge_recursive(SlotSettings, custom_slot_settings)
+table.merge_recursive(SlotTypeSettings, custom_slot_templates)
+
+-- Debug function to print table contents
+local function debug_print_table(tbl, name)
+    if tbl then
+        mod:echo(name .. " contents:")
+        for k, v in pairs(tbl) do
+            if type(v) == "table" then
+                mod:echo(tostring(k) .. ": table: " .. tostring(v))
+                for sub_k, sub_v in pairs(v) do
+                    mod:echo("  " .. tostring(sub_k) .. ": " .. tostring(sub_v))
+                end
+            else
+                mod:echo(tostring(k) .. ": " .. tostring(v))
+            end
+        end
+    else
+        mod:echo(name .. " is nil")
+    end
+end
+
+-- Debugging function to print table contents
+local function debug_print_table_contents(tbl, tbl_name)
+    if not tbl then
+        mod:echo(string.format("%s is nil", tbl_name))
+        return
+    end
+
+    for key, value in pairs(tbl) do
+        mod:echo(string.format("%s[%s] = %s", tbl_name, tostring(key), tostring(value)))
+    end
+end
+
+-- Debug output after merging
+debug_print_table(SlotSettings, "SlotSettings after merge")
+debug_print_table(SlotTypeSettings, "SlotTypeSettings after merge")
+
+-- Ensure slot_config is initialized
+SlotSettings.slot_config = SlotSettings.slot_config or {
+    num_normal_slots = 9,
+    num_medium_slots = 8,
+    num_large_slots = 4,
+}
+
+print("[slots] SlotSettings and SlotTemplates overridden successfully")
+
+-- Include debug visualizer files
+mod:dofile("scripts/mods/slots/game-code/debug-drawer")
+local debuggers = mod:dofile("scripts/mods/slots/game-code/ai_slot_system")
+local debug_draw_slots = debuggers.debug_draw_slots
+
+-- Ensure extensions table is defined
+AISlotSystem.extensions = {
+    "AIEnemySlotExtension",
+    "AIPlayerSlotExtension",
+    "AIAggroableSlotExtension"
+}
+
+AISlotSystem2.extensions = {
+    "AIEnemySlotExtension",
+    "AIPlayerSlotExtension",
+    "AIAggroableSlotExtension"
+}
+
+-- Define `unit_alive` function
+local function unit_alive(unit)
+    return ALIVE[unit]
+end
+
+-- Custom create_target_slots function
+local function custom_create_target_slots(target_unit, target_unit_extension, color_index)
+    mod:echo("create_target_slots called")
+    
+    local entity = target_unit_extension.entity
+    if not entity then
+        mod:echo("Entity is nil for target unit extension")
+        return
+    end
+
+    local all_slots = target_unit_extension.all_slots
+
+    for slot_type, slot_data in pairs(all_slots) do
+        local custom_count = SlotSettings.slot_config[slot_type .. "_slots"] or slot_data.total_slots_count
+        mod:echo(string.format("Creating %d %s slots for unit", custom_count, slot_type))
+        slot_data.total_slots_count = custom_count  -- Use custom count if available
+        local total_slots_count = slot_data.total_slots_count
+        local slots = slot_data.slots
+
+        for i = 1, total_slots_count do
+            local slot = {}
+
+            slot.target_unit = target_unit
+            slot.owner_extension = target_unit_extension
+            slot.queue = {}
+            slot.original_absolute_position = Vector3Box(0, 0, 0)
+            slot.absolute_position = Vector3Box(0, 0, 0)
+            slot.ghost_position = Vector3Box(0, 0, 0)
+            slot.queue_direction = Vector3Box(0, 0, 0)
+            slot.position_right = Vector3Box(0, 0, 0)
+            slot.position_left = Vector3Box(0, 0, 0)
+            slot.index = i
+            slot.anchor_weight = 0
+            slot.type = slot_type
+            slot.radians = math.degrees_to_radians(360 / total_slots_count)
+            slot.priority = slot_data.priority
+            slot.position_check_index = SLOT_POSITION_CHECK_INDEX.CHECK_MIDDLE
+
+            slot.debug_color_name = SlotTypeSettings[slot_type].debug_color
+            slots[i] = slot
+
+            -- Additional debug info for each slot
+            mod:echo(string.format("Slot %d for %s created with position (%f, %f, %f)", i, slot_type, slot.original_absolute_position:unbox()))
+        end
+
+        mod:echo(string.format("Finished creating %d %s slots", total_slots_count, slot_type))
+    end
+end
+
+-- Hook the original create_target_slots function
+mod:hook(AIPlayerSlotExtension, "_create_target_slots", function(func, self, ...)
+    return custom_create_target_slots(...)
+end)
+
+-- Custom on_add_extension function
+local function custom_on_add_extension(self, world, unit, extension_name, extension_init_data)
+    local extension = {}
+
+    ScriptUnit.set_extension(unit, "ai_slot_system", extension, dummy_input)
+
+    self.unit_extension_data[unit] = extension
+
+    if extension_name == "AIPlayerSlotExtension" or extension_name == "AIAggroableSlotExtension" then
+        local debug_color_index
+
+        if extension_name == "AIPlayerSlotExtension" then
+            debug_color_index = extension_init_data.profile_index
+        elseif extension_name == "AIAggroableSlotExtension" then
+            debug_color_index = AGGROABLE_SLOT_COLOR_INDEX
+
+            local _, is_level_unit = Managers.state.network:game_object_or_level_id(unit)
+
+            if is_level_unit then
+                POSITION_LOOKUP[unit] = Unit.world_position(unit, 0)
+            end
+        end
+
+        extension.all_slots = {}
+
+        for slot_type, setting in pairs(SlotTypeSettings) do
+            local unit_data_var_name = slot_type == "normal" and "ai_slots_count" or "ai_slots_count_" .. slot_type
+            local total_slots_count = Unit.get_data(unit, unit_data_var_name) or setting.count
+            local slot_data = {}
+
+            slot_data.total_slots_count = total_slots_count
+            slot_data.slot_radians = math.degrees_to_radians(360 / total_slots_count)
+            slot_data.slots_count = 0
+            slot_data.use_wait_slots = setting.use_wait_slots
+            slot_data.priority = setting.priority
+            slot_data.disabled_slots_count = 0
+            slot_data.slots = {}
+            extension.all_slots[slot_type] = slot_data
+        end
+
+        local target_index = #self.target_units + 1
+
+        extension.dogpile = 0
+        extension.position = Vector3Box(POSITION_LOOKUP[unit])
+        extension.moved_at = 0
+        extension.next_slot_status_update_at = 0
+        extension.valid_target = true
+        extension.index = target_index
+        extension.debug_color_name = SLOT_COLORS[debug_color_index][1]
+        extension.num_occupied_slots = 0
+        extension.has_slots_attached = true
+        extension.delayed_num_occupied_slots = 0
+        extension.delayed_slot_decay_t = 0
+        extension.full_slots_at_t = {}
+
+        custom_create_target_slots(unit, extension, debug_color_index)
+
+        self.target_units[target_index] = unit
+
+        local target_units = self.target_units
+        local nav_world = self.nav_world
+        local traverse_logic = self._traverse_logic
+        local unit_extension_data = self.unit_extension_data
+
+        self:update_target_slots(0, unit, target_units, unit_extension_data, extension, nav_world, traverse_logic)
+    end
+
+    if extension_name == "AIEnemySlotExtension" then
+        extension.target = nil
+        extension.target_position = Vector3Box()
+        extension.improve_wait_slot_position_t = 0
+        self.update_slots_ai_units[#self.update_slots_ai_units + 1] = unit
+    end
+
+    return extension
+end
+
+-- Hook the original on_add_extension function
+mod:hook(AISlotSystem, "on_add_extension", function(func, self, ...)
+    return custom_on_add_extension(self, ...)
+end)
+
+-- Override AISlotSystem init function
+AISlotSystem.init = function(self, context, system_name)
+    debug_print_table(SlotSettings, "SlotSettings at AISlotSystem.init")
+    debug_print_table(SlotTypeSettings, "SlotTypeSettings at AISlotSystem.init")
+
+    AISlotSystem.super.init(self, context, system_name, AISlotSystem.extensions)
+
+    local entity_manager = context.entity_manager
+    entity_manager:register_system(self, system_name, AISlotSystem.extensions)
+
+    self.num_normal_slots = SlotSettings.slot_config.num_normal_slots
+    self.num_medium_slots = SlotSettings.slot_config.num_medium_slots
+    self.num_large_slots = SlotSettings.slot_config.num_large_slots
+
+    mod:echo(string.format("Initialized with %d normal slots, %d medium slots, %d large slots", self.num_normal_slots, self.num_medium_slots, self.num_large_slots))
+
+    self.entity_manager = entity_manager
+    self.is_server = context.is_server
+    self.world = context.world
+    self.unit_storage = context.unit_storage
+    self.nav_world = Managers.state.entity:system("ai_system"):nav_world()
+    self.unit_extension_data = {}
+    self.frozen_unit_extension_data = {}
+    self.update_slots_ai_units = {}
+    self.update_slots_ai_units_prioritized = {}
+    self.target_units = {}
+    self.current_ai_index = 1
+    self.next_total_slot_count_update = 0
+    self.next_disabled_slot_count_update = 0
+    self.next_slot_sound_update = 0
+    self.network_transmit = context.network_transmit
+    self.num_total_enemies = 0
+    self.num_occupied_slots = 0
+
+    local nav_tag_layer_costs = {
+        bot_poison_wind = 1,
+        bot_ratling_gun_fire = 1,
+        fire_grenade = 1,
+    }
+
+    table.merge(nav_tag_layer_costs, NAV_TAG_VOLUME_LAYER_COST_AI)
+
+    local navtag_layer_cost_table = GwNavTagLayerCostTable.create()
+
+    self._navtag_layer_cost_table = navtag_layer_cost_table
+
+    AiUtils.initialize_cost_table(navtag_layer_cost_table, nav_tag_layer_costs)
+
+    local nav_cost_map_cost_table = GwNavCostMap.create_tag_cost_table()
+
+    self._nav_cost_map_cost_table = nav_cost_map_cost_table
+
+    AiUtils.initialize_nav_cost_map_cost_table(nav_cost_map_cost_table, nil, 1)
+
+    self._traverse_logic = GwNavTraverseLogic.create(self.nav_world, nav_cost_map_cost_table)
+
+    GwNavTraverseLogic.set_navtag_layer_cost_table(self._traverse_logic, navtag_layer_cost_table)
+
+    -- Call modified slot creation
+    for _, target_unit in ipairs(self.target_units) do
+        local target_unit_extension = self.unit_extension_data[target_unit]
+        if target_unit_extension then
+            custom_create_target_slots(target_unit, target_unit_extension, 1)
+        end
+    end
+end
+
+-- Override AISlotSystem2 init function
+AISlotSystem2.init = function(self, context, system_name)
+    debug_print_table(SlotSettings, "SlotSettings at AISlotSystem2.init")
+    debug_print_table(SlotTypeSettings, "SlotTypeSettings at AISlotSystem2.init")
+
+    AISlotSystem2.super.init(self, context, system_name, AISlotSystem2.extensions)
+
+    self.num_normal_slots = SlotSettings.slot_config.num_normal_slots
+    self.num_medium_slots = SlotSettings.slot_config.num_medium_slots
+    self.num_large_slots = SlotSettings.slot_config.num_large_slots
+
+    mod:echo(string.format("Initialized with %d normal slots, %d medium slots, %d large slots", self.num_normal_slots, self.num_medium_slots, self.num_large_slots))
+
+    self.nav_world = Managers.state.entity:system("ai_system"):nav_world()
+    self.unit_extension_data = {}
+    self.frozen_unit_extension_data = {}
+    self.update_slots_ai_units = {}
+    self.update_slots_ai_units_prioritized = {}
+    self.target_units = {}
+    self.current_ai_index = 1
+    self.next_total_slot_count_update = 0
+    self.next_disabled_slot_count_update = 0
+    self next_slot_sound_update = 0
+    self.network_transmit = context.network_transmit
+    self.num_total_enemies = 0
+    self.num_occupied_slots = 0
+
+    local nav_tag_layer_costs = {
+        bot_poison_wind = 1,
+        bot_ratling_gun_fire = 1,
+        fire_grenade = 1,
+    }
+
+    table.merge(nav_tag_layer_costs, NAV_TAG_VOLUME_LAYER_COST_AI)
+
+    local navtag_layer_cost_table = GwNavTagLayerCostTable.create()
+
+    self._navtag_layer_cost_table = navtag_layer_cost_table
+
+    AiUtils.initialize_cost_table(navtag_layer_cost_table, nav_tag_layer_costs)
+
+    local nav_cost_map_cost_table = GwNavCostMap.create_tag_cost_table()
+
+    self._nav_cost_map_cost_table = nav_cost_map_cost_table
+
+    AiUtils.initialize_nav_cost_map_cost_table(nav_cost_map_cost_table, nil, 1)
+
+    self._traverse_logic = GwNavTraverseLogic.create(self.nav_world, nav_cost_map_cost_table)
+
+    GwNavTraverseLogic.set_navtag_layer_cost_table(self._traverse_logic, navtag_layer_cost_table)
+
+    -- Call modified slot creation
+    for _, target_unit in ipairs(self.target_units) do
+        local target_unit_extension = self.unit_extension_data[target_unit]
+        if target_unit_extension then
+            custom_create_target_slots(target_unit, target_unit_extension, 1)
+        end
+    end
+end
+
+-- Enable debug visualizer
+local enabled = false
+
+mod:command("debug_slots", "Enable the Slot Debug UI", function()
+    enabled = not enabled
+
+    script_data.disable_debug_draw = not enabled
+    Development._hardcoded_dev_params.disable_debug_draw = not enabled
+end)
+
+mod:hook_safe(Boot, "game_update", function(_, real_world_dt)
+    if enabled then
+        local t = Managers.time:time("main")
+        local ai_slot_system = Managers.state.entity:system("ai_slot_system")
+        local target_units = ai_slot_system.target_units
+        local unit_extension_data = ai_slot_system.unit_extension_data
+        local nav_world = ai_slot_system.nav_world
+
+        -- Make unit_alive function available within debug_draw_slots
+        local function unit_alive(unit)
+            return ALIVE[unit]
+        end
+
+        debug_draw_slots(target_units, unit_extension_data, nav_world, t)
+        
+        if Managers.state.debug then
+            for _, drawer in pairs(Managers.state.debug._drawers) do
+                drawer:update(Managers.state.debug._world)
+            end
+        end
+    end
+end)
