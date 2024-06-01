@@ -379,6 +379,12 @@ function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
         end
     end
 
+    -- Ensure that Managers.state.debug._world is of the correct type
+    if type(Managers.state.debug._world) ~= "userdata" then
+        mod:echo("Error: Managers.state.debug._world is not userdata")
+        return
+    end
+
     debug_drawer:update(Managers.state.debug._world)
 end
 
