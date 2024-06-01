@@ -385,6 +385,12 @@ function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
         return
     end
 
+    -- Debugging: Check if Managers.state.debug._world is of type World
+    if not World.is_world(Managers.state.debug._world) then
+        mod:echo("Error: Managers.state.debug._world is not of type World")
+        return
+    end
+
     debug_drawer:update(Managers.state.debug._world)
 end
 
