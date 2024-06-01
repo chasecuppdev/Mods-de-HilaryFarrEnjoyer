@@ -15,8 +15,8 @@ local function unit_alive(unit)
     return ALIVE[unit]
 end
 
--- Function to log argument types
-local function log_argument_types(...)
+-- Function to log argument types and values
+local function log_argument_types_and_values(...)
     local args = {...}
     for i, arg in ipairs(args) do
         mod:echo(string.format("Argument %d: %s (type: %s)", i, tostring(arg), type(arg)))
@@ -365,7 +365,7 @@ end
 
 -- Function to draw debug visuals for the AI slot system
 function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
-    local debug_drawer = DebugDrawerRelease:new()
+    local debug_drawer = DebugDrawerRelease:new(LineObject, "immediate")
 
     for _, unit in ipairs(target_units) do
         local extension = unit_extension_data[unit]
@@ -385,13 +385,13 @@ end
 -- HOOKS
 -- Hook the original create_target_slots function in AIPlayerSlotExtension
 mod:hook(AIPlayerSlotExtension, "_create_target_slots", function(func, self, ...)
-    log_argument_types(self, ...)
+    log_argument_types_and_values(self, ...)
     return custom_create_target_slots(self, ...)
 end)
 
 -- Hook into get_slot_position_on_navmesh_from_outside_target
 mod:hook(AIPlayerSlotExtension, "get_slot_position_on_navmesh_from_outside_target", function (func, target_position, slot_direction, _, distance, nav_world, above, below)
-    log_argument_types(target_position, slot_direction, _, distance, nav_world, above, below)
+    log_argument_types_and_values(target_position, slot_direction, _, distance, nav_world, above, below)
     mod:echo(string.format("Calling get_slot_position_on_navmesh_from_outside_target with target_position: %s, slot_direction: %s, distance: %s, nav_world: %s, above: %s, below: %s",
         tostring(target_position), tostring(slot_direction), tostring(distance), tostring(nav_world), tostring(above), tostring(below)))
     
@@ -404,7 +404,7 @@ end)
 
 -- Hook the original on_add_extension function
 mod:hook(AISlotSystem, "on_add_extension", function(func, self, ...)
-    log_argument_types(self, ...)
+    log_argument_types_and_values(self, ...)
     return custom_on_add_extension(self, ...)
 end)
 
@@ -438,7 +438,10 @@ mod:hook_safe(Boot, "game_update", function(_, real_world_dt)
             return ALIVE[unit]
         end
 
-        debug_draw_slots(target_units, unit_extension_data, nav_world, t)
+        -- Example usage of debug_print_table
+        debug_print_table(target_units, "Target Units")
+
+        mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
         
         if Managers.state.debug then
             for _, drawer in pairs(Managers.state.debug._drawers) do
