@@ -225,4 +225,4 @@ DebugDrawerRelease.update = function(self, world)
 	end
 end
 
-return
+return DebugDrawerRelease

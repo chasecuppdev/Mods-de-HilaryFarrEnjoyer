@@ -22,6 +22,23 @@ SlotTypeSettings = SlotTypeSettings or {}
 table.merge_recursive(SlotSettings, custom_slot_settings)
 table.merge_recursive(SlotTypeSettings, custom_slot_templates)
 
+-- Debug output after merging
+debug_print_table(SlotSettings, "SlotSettings after merge")
+debug_print_table(SlotTypeSettings, "SlotTypeSettings after merge")
+
+-- Ensure slot_config is initialized
+SlotSettings.slot_config = SlotSettings.slot_config or {
+    num_normal_slots = 9,
+    num_medium_slots = 8,
+    num_large_slots = 4,
+}
+
+print("[slots] SlotSettings and SlotTemplates overridden successfully")
+
+-- Include debug visualizer files
+local debuggers = mod:dofile("scripts/mods/slots/game-code/ai_slot_system")
+local debug_draw_slots = debuggers.debug_draw_slots
+
 -- Debugging function to print variable values
 local function debug_variables(...)
     local vars = {...}
@@ -47,7 +64,7 @@ local function debug_print_table(tbl, name)
             if type(v) == "table" then
                 mod:echo(tostring(k) .. ": table: " .. tostring(v))
                 for sub_k, sub_v in pairs(v) do
-                    mod:echo("  " .. tostring(sub_k) .. ": " .. tostring(sub_v)))
+                    mod:echo("  " .. tostring(sub_k) .. ": " .. tostring(sub_v))
                 end
             else
                 mod:echo(tostring(k) .. ": " .. tostring(v))
@@ -69,24 +86,6 @@ local function debug_print_table_contents(tbl, tbl_name)
         mod:echo(string.format("%s[%s] = %s", tbl_name, tostring(key), tostring(value)))
     end
 end
-
--- Debug output after merging
-debug_print_table(SlotSettings, "SlotSettings after merge")
-debug_print_table(SlotTypeSettings, "SlotTypeSettings after merge")
-
--- Ensure slot_config is initialized
-SlotSettings.slot_config = SlotSettings.slot_config or {
-    num_normal_slots = 9,
-    num_medium_slots = 8,
-    num_large_slots = 4,
-}
-
-print("[slots] SlotSettings and SlotTemplates overridden successfully")
-
--- Include debug visualizer files
-mod:dofile("scripts/mods/slots/game-code/debug-drawer")
-local debuggers = mod:dofile("scripts/mods/slots/game-code/ai_slot_system")
-local debug_draw_slots = debuggers.debug_draw_slots
 
 -- Ensure extensions table is defined
 AISlotSystem.extensions = {
@@ -116,11 +115,8 @@ local function custom_create_target_slots(self, unit, num_slots, slot_type, colo
     local below = SLOT_Z_MAX_DOWN or 1  -- Replace with appropriate value
 
     -- Debugging statements
-    print("Creating target slots for unit:", target_unit_str)
-    print("Self object:", self)
-    print("Num slots:", num_slots)
-    print("Slot type:", slot_type)
-    print("Color:", color)
+    mod:echo(string.format("Creating target slots for unit: %s", target_unit_str))
+    mod:echo(string.format("Num slots: %d, Slot type: %s, Color: %s", num_slots, slot_type, color))
 
     for i = 1, num_slots do
         local slot_data = {
@@ -153,19 +149,9 @@ local function custom_create_target_slots(self, unit, num_slots, slot_type, colo
 
         if position then
             slot_data.position = position
-            local success, result = pcall(function()
-                return string.format("Slot %d for %s created with position (%f, %f, %f)", i, target_unit_str, position.x, position.y, position.z)
-            end)
-
-            if not success then
-                -- Handle the error in case of failure
-                print("Error in string formatting:", result)
-            else
-                -- Log the successfully formatted message
-                print(result)
-            end
+            mod:echo(string.format("Slot %d for %s created with position (%f, %f, %f)", i, target_unit_str, position.x, position.y, position.z))
         else
-            print(string.format("Failed to create slot %d for %s", i, target_unit_str))
+            mod:echo(string.format("Failed to create slot %d for %s", i, target_unit_str))
         end
     end
 end
@@ -446,55 +432,19 @@ end)
 
 -- Function to draw debug visuals for the AI slot system
 function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
-    local slot_settings = SlotSettings
-    local slot_data = {} -- Collect slot data here
+    local debug_drawer = DebugDrawerRelease:new()
 
-    -- Populate slot_data with the current slot positions and other relevant information
-    for _, target_unit in ipairs(target_units) do
-        local unit_data = unit_extension_data[target_unit]
-        if unit_data then
-            for slot_type, slots in pairs(unit_data.slots) do
-                slot_data[slot_type] = slot_data[slot_type] or {}
-                for _, slot in ipairs(slots) do
-                    table.insert(slot_data[slot_type], {position = slot.position})
-                end
-            end
-        end
-    end
+    for _, unit in ipairs(target_units) do
+        local extension = unit_extension_data[unit]
 
-    -- Draw the slots using the debug drawer
-    for slot_type, slots in pairs(slot_data) do
-        local settings = slot_settings[slot_type]
-        if settings then
-            for _, slot in ipairs(slots) do
+        if extension and extension.slots then
+            for _, slot in ipairs(extension.slots) do
                 if slot.position then
-                    debug_drawer:circle(slot.position, settings.radius, settings.debug_color)
+                    debug_drawer:sphere(slot.position, 0.5, Color(255, 0, 0))
                 end
             end
         end
     end
+
+    debug_drawer:update(Managers.state.debug._world)
 end
-
--- Hook the debug draw function into the game update loop
-mod:hook_safe(Boot, "game_update", function(_, real_world_dt)
-    if enabled then
-        local t = Managers.time:time("main")
-        local ai_slot_system = Managers.state.entity:system("ai_slot_system")
-        local target_units = ai_slot_system.target_units
-        local unit_extension_data = ai_slot_system.unit_extension_data
-        local nav_world = ai_slot_system.nav_world
-
-        -- Make unit_alive function available within debug_draw_slots
-        local function unit_alive(unit)
-            return ALIVE[unit]
-        end
-
-        mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
-        
-        if Managers.state.debug then
-            for _, drawer in pairs(Managers.state.debug._drawers) do
-                drawer:update(Managers.state.debug._world)
-            end
-        end
-    end
-end)
