@@ -1,5 +1,7 @@
 -- luacheck: globals DebugDrawerRelease LineObject fassert Quaternion Color Matrix4x4 Actor Vector3 Unit script_data NavigationMesh class
 
+local mod = get_mod("slots")
+
 DebugDrawerRelease = class(DebugDrawerRelease)
 
 function DebugDrawerRelease:init(line_object, mode)
