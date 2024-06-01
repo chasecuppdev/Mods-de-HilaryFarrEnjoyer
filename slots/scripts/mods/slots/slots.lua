@@ -1,4 +1,6 @@
 local mod = get_mod("slots")
+local DebugDrawerRelease = require("scripts/mods/slots/game-code/debug-drawer")
+local debug_drawer = DebugDrawerRelease:new()
 
 local AISlotUtils = require("scripts/entity_system/systems/ai/ai_slot_utils")
 local AIPlayerSlotExtension = require("scripts/entity_system/systems/ai/ai_player_slot_extension")
@@ -45,7 +47,7 @@ local function debug_print_table(tbl, name)
             if type(v) == "table" then
                 mod:echo(tostring(k) .. ": table: " .. tostring(v))
                 for sub_k, sub_v in pairs(v) do
-                    mod:echo("  " .. tostring(sub_k) .. ": " .. tostring(sub_v))
+                    mod:echo("  " .. tostring(sub_k) .. ": " .. tostring(sub_v)))
                 end
             else
                 mod:echo(tostring(k) .. ": " .. tostring(v))
@@ -433,6 +435,61 @@ mod:hook_safe(Boot, "game_update", function(_, real_world_dt)
         end
 
         debug_draw_slots(target_units, unit_extension_data, nav_world, t)
+        
+        if Managers.state.debug then
+            for _, drawer in pairs(Managers.state.debug._drawers) do
+                drawer:update(Managers.state.debug._world)
+            end
+        end
+    end
+end)
+
+-- Function to draw debug visuals for the AI slot system
+function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
+    local slot_settings = SlotSettings
+    local slot_data = {} -- Collect slot data here
+
+    -- Populate slot_data with the current slot positions and other relevant information
+    for _, target_unit in ipairs(target_units) do
+        local unit_data = unit_extension_data[target_unit]
+        if unit_data then
+            for slot_type, slots in pairs(unit_data.slots) do
+                slot_data[slot_type] = slot_data[slot_type] or {}
+                for _, slot in ipairs(slots) do
+                    table.insert(slot_data[slot_type], {position = slot.position})
+                end
+            end
+        end
+    end
+
+    -- Draw the slots using the debug drawer
+    for slot_type, slots in pairs(slot_data) do
+        local settings = slot_settings[slot_type]
+        if settings then
+            for _, slot in ipairs(slots) do
+                if slot.position then
+                    debug_drawer:circle(slot.position, settings.radius, settings.debug_color)
+                end
+            end
+        end
+    end
+end
+
+-- Hook the debug draw function into the game update loop
+mod:hook_safe(Boot, "game_update", function(_, real_world_dt)
+    if enabled then
+        local t = Managers.time:time("main")
+        local ai_slot_system = Managers.state.entity:system("ai_slot_system")
+        local target_units = ai_slot_system.target_units
+        local unit_extension_data = ai_slot_system.unit_extension_data
+        local nav_world = ai_slot_system.nav_world
+
+        -- Make unit_alive function available within debug_draw_slots
+        local function unit_alive(unit)
+            return ALIVE[unit]
+        end
+
+        mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
         
         if Managers.state.debug then
             for _, drawer in pairs(Managers.state.debug._drawers) do

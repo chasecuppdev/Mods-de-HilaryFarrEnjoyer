@@ -27,6 +27,20 @@ DebugDrawerRelease.sphere = function(self, center, radius, color, segments, part
 	LineObject.add_sphere(self._line_object, color, center, radius, segments or 20, parts or 2)
 end
 
+DebugDrawerRelease.draw_slots = function (self, slot_settings, slot_data)
+    for slot_type, settings in pairs(slot_settings) do
+        for _, slot in ipairs(slot_data[slot_type]) do
+            local position = slot.position
+            local color = settings.color or Color(255, 255, 255)
+            self:sphere(position, settings.radius, color)
+        end
+    end
+end
+
+DebugDrawerRelease.draw_sphere = function (self, position, radius, color)
+    self:sphere(position, radius, color)
+end
+
 DebugDrawerRelease.capsule_overlap = function(self, position, size, rotation, color)
 	fassert(
 		size.x == size.z,

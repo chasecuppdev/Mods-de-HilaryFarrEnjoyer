@@ -1,4 +1,9 @@
 local mod = get_mod("slots")
+local DebugDrawerRelease = require("scripts/mods/slots/game-code/debug-drawer")
+local debug_drawer = DebugDrawerRelease:new()
+
+local AISlotUtils = require("scripts/entity_system/systems/ai/ai_slot_utils")
+local AIPlayerSlotExtension = require("scripts/entity_system/systems/ai/ai_player_slot_extension")
 
 local base_slot_settings = require("scripts/settings/slot_settings")
 local base_slot_templates = require("scripts/settings/slot_templates")
@@ -16,6 +21,23 @@ SlotTypeSettings = SlotTypeSettings or {}
 -- Merge custom settings with base settings
 table.merge_recursive(SlotSettings, custom_slot_settings)
 table.merge_recursive(SlotTypeSettings, custom_slot_templates)
+
+-- Debugging function to print variable values
+local function debug_variables(...)
+    local vars = {...}
+    for i, var in ipairs(vars) do
+        mod:echo(string.format("Variable %d: %s", i, tostring(var)))
+    end
+end
+
+-- Define echo_table if it's not already defined
+if not mod.echo_table then
+    function mod:echo_table(tbl)
+        for k, v in pairs(tbl) do
+            self:echo(string.format("%s: %s", tostring(k), tostring(v)))
+        end
+    end
+end
 
 -- Debug function to print table contents
 local function debug_print_table(tbl, name)
@@ -84,58 +106,91 @@ local function unit_alive(unit)
     return ALIVE[unit]
 end
 
--- Custom create_target_slots function
-local function custom_create_target_slots(target_unit, target_unit_extension, color_index)
-    mod:echo("create_target_slots called")
-    
-    local entity = target_unit_extension.entity
-    if not entity then
-        mod:echo("Entity is nil for target unit extension")
-        return
-    end
+local function custom_create_target_slots(self, unit, num_slots, slot_type, color)
+    -- Ensure self.slots is initialized
+    self.slots = self.slots or {}
 
-    local all_slots = target_unit_extension.all_slots
+    local target_unit_str = tostring(unit)
+    local nav_world = self.nav_world  -- Assuming nav_world is accessible from self
+    local above = SLOT_Z_MAX_UP or 1  -- Replace with appropriate value
+    local below = SLOT_Z_MAX_DOWN or 1  -- Replace with appropriate value
 
-    for slot_type, slot_data in pairs(all_slots) do
-        local custom_count = SlotSettings.slot_config[slot_type .. "_slots"] or slot_data.total_slots_count
-        mod:echo(string.format("Creating %d %s slots for unit", custom_count, slot_type))
-        slot_data.total_slots_count = custom_count  -- Use custom count if available
-        local total_slots_count = slot_data.total_slots_count
-        local slots = slot_data.slots
+    -- Debugging statements
+    print("Creating target slots for unit:", target_unit_str)
+    print("Self object:", self)
+    print("Num slots:", num_slots)
+    print("Slot type:", slot_type)
+    print("Color:", color)
 
-        for i = 1, total_slots_count do
-            local slot = {}
+    for i = 1, num_slots do
+        local slot_data = {
+            slot_type = slot_type,
+            color = color,
+            position = nil,
+            occupied = false,
+            debug_color_name = color,
+            attached_to_unit = nil,
+            last_occupied_time = 0,
+            full_slots_at_t = {},
+            delayed_slot_decay_t = 0,
+            has_slots_attached = true,
+            delayed_num_occupied_slots = 0,
+            moved_at = 0,
+            next_slot_status_update_at = 0,
+            dogpile = 0,
+        }
 
-            slot.target_unit = target_unit
-            slot.owner_extension = target_unit_extension
-            slot.queue = {}
-            slot.original_absolute_position = Vector3Box(0, 0, 0)
-            slot.absolute_position = Vector3Box(0, 0, 0)
-            slot.ghost_position = Vector3Box(0, 0, 0)
-            slot.queue_direction = Vector3Box(0, 0, 0)
-            slot.position_right = Vector3Box(0, 0, 0)
-            slot.position_left = Vector3Box(0, 0, 0)
-            slot.index = i
-            slot.anchor_weight = 0
-            slot.type = slot_type
-            slot.radians = math.degrees_to_radians(360 / total_slots_count)
-            slot.priority = slot_data.priority
-            slot.position_check_index = SLOT_POSITION_CHECK_INDEX.CHECK_MIDDLE
+        table.insert(self.slots, slot_data)
 
-            slot.debug_color_name = SlotTypeSettings[slot_type].debug_color
-            slots[i] = slot
+        -- Use get_slot_position_on_navmesh_from_outside_target to get the slot position
+        local slot_direction = Vector3(1, 0, 0)  -- Replace with appropriate initial direction
+        local distance = SlotTypeSettings[slot_type].distance
+        local target_position = POSITION_LOOKUP[unit]
 
-            -- Additional debug info for each slot
-            mod:echo(string.format("Slot %d for %s created with position (%f, %f, %f)", i, slot_type, slot.original_absolute_position:unbox()))
+        local position, _ = get_slot_position_on_navmesh_from_outside_target(
+            target_position, slot_direction, nil, distance, nav_world, above, below
+        )
+
+        if position then
+            slot_data.position = position
+            local success, result = pcall(function()
+                return string.format("Slot %d for %s created with position (%f, %f, %f)", i, target_unit_str, position.x, position.y, position.z)
+            end)
+
+            if not success then
+                -- Handle the error in case of failure
+                print("Error in string formatting:", result)
+            else
+                -- Log the successfully formatted message
+                print(result)
+            end
+        else
+            print(string.format("Failed to create slot %d for %s", i, target_unit_str))
         end
-
-        mod:echo(string.format("Finished creating %d %s slots", total_slots_count, slot_type))
     end
 end
 
--- Hook the original create_target_slots function
+-- Hook the original create_target_slots function in AIPlayerSlotExtension
 mod:hook(AIPlayerSlotExtension, "_create_target_slots", function(func, self, ...)
-    return custom_create_target_slots(...)
+    return custom_create_target_slots(self, ...)
+end)
+
+mod:hook(AIPlayerSlotExtension, "get_reachable_slot_position_on_navmesh", function (func, self, slot, locomotion_ext, target_position, wanted_position, radians, distance, should_offset_slot, nav_world, traverse_logic, above, below)
+    local slot_position, original_position = func(self, slot, locomotion_ext, target_position, wanted_position, radians, distance, should_offset_slot, nav_world, traverse_logic, above, below)
+    mod:echo(string.format("Slot position for slot type %s: %s", slot.type, tostring(slot_position)))
+    return slot_position, original_position
+end)
+
+-- Hook into get_slot_position_on_navmesh_from_outside_target
+mod:hook(AIPlayerSlotExtension, "get_slot_position_on_navmesh_from_outside_target", function (func, target_position, slot_direction, _, distance, nav_world, above, below)
+    mod:echo(string.format("Calling get_slot_position_on_navmesh_from_outside_target with target_position: %s, slot_direction: %s, distance: %s, nav_world: %s, above: %s, below: %s",
+        tostring(target_position), tostring(slot_direction), tostring(distance), tostring(nav_world), tostring(above), tostring(below)))
+    
+    local position, original_position = func(target_position, slot_direction, _, distance, nav_world, above, below)
+    
+    mod:echo(string.format("Resulting position: %s", tostring(position)))
+    
+    return position, original_position
 end)
 
 -- Custom on_add_extension function
@@ -193,7 +248,7 @@ local function custom_on_add_extension(self, world, unit, extension_name, extens
         extension.delayed_slot_decay_t = 0
         extension.full_slots_at_t = {}
 
-        custom_create_target_slots(unit, extension, debug_color_index)
+        custom_create_target_slots(extension, unit, debug_color_index)
 
         self.target_units[target_index] = unit
 
@@ -282,7 +337,7 @@ AISlotSystem.init = function(self, context, system_name)
     for _, target_unit in ipairs(self.target_units) do
         local target_unit_extension = self.unit_extension_data[target_unit]
         if target_unit_extension then
-            custom_create_target_slots(target_unit, target_unit_extension, 1)
+            custom_create_target_slots(target_unit_extension, target_unit, 1)
         end
     end
 end
@@ -309,7 +364,7 @@ AISlotSystem2.init = function(self, context, system_name)
     self.current_ai_index = 1
     self.next_total_slot_count_update = 0
     self.next_disabled_slot_count_update = 0
-    self next_slot_sound_update = 0
+    self.next_slot_sound_update = 0
     self.network_transmit = context.network_transmit
     self.num_total_enemies = 0
     self.num_occupied_slots = 0
@@ -342,10 +397,19 @@ AISlotSystem2.init = function(self, context, system_name)
     for _, target_unit in ipairs(self.target_units) do
         local target_unit_extension = self.unit_extension_data[target_unit]
         if target_unit_extension then
-            custom_create_target_slots(target_unit, target_unit_extension, 1)
+            custom_create_target_slots(target_unit_extension, target_unit, 1)
         end
     end
 end
+
+mod:hook_safe(AISlotSystem2, "init", function (self, context, system_name)
+    mod:echo("SlotSettings at AISlotSystem2.init contents:")
+    mod:echo_table(SlotSettings)
+    mod:echo("SlotTypeSettings at AISlotSystem2.init contents:")
+    mod:echo_table(SlotTypeSettings)
+    mod:echo(string.format("Initialized with %d normal slots, %d medium slots, %d large slots",
+        SlotSettings.normal.count, SlotSettings.medium.count, SlotSettings.large.count))
+end)
 
 -- Enable debug visualizer
 local enabled = false
@@ -379,3 +443,21 @@ mod:hook_safe(Boot, "game_update", function(_, real_world_dt)
         end
     end
 end)
+
+-- Function to draw debug visuals for the AI slot system
+function mod:debug_draw_slots(target_units, unit_extension_data, nav_world, t)
+    local slot_settings = SlotSettings
+    local slot_data = {} -- Collect slot data here
+
+    -- Populate slot_data with the current slot positions and other relevant information
+    for _, target_unit in ipairs(target_units) do
+        local unit_data = unit_extension_data[target_unit]
+        if unit_data then
+            for slot_type, slots in pairs(unit_data.slots) do
+                slot_data[slot_type] = slot_data[slot_type] or {}
+                for _, slot in ipairs(slots) do
+                    table.insert(slot_data[slot_type], {position = slot.position})
+                end
+            end
+        end
+    end
