@@ -1,3 +1,5 @@
+local mod = get_mod("slots")
+
 -- luacheck: globals Managers Vector3 Colors AiUtils ALIVE SlotTypeSettings POSITION_LOOKUP Unit Quaternion GwNavQueries Color Debug get_mod
 -- ai_slot_system.lua 
 local unit_alive = function(unit)
@@ -61,32 +63,38 @@ local function get_anchor_slot(slot_type, target_unit, unit_extension_data)
     local slot_data = target_unit_extension.all_slots[slot_type]
     local target_slots = slot_data.slots
     local total_slots_count = slot_data.total_slots_count
+
+    -- Initialize best_slot as nil and check if target_slots is not empty
     local best_slot = target_slots[1]
+    if not best_slot then
+        mod:echo("Error: No slots available for slot_type: " .. slot_type .. ", target_unit: " .. tostring(target_unit))
+        return nil
+    end
+
     local best_anchor_weight = best_slot.anchor_weight
 
     for i = 1, total_slots_count, 1 do
-        repeat
-            local slot = target_slots[i]
-            local slot_disabled = slot.disabled
+        local slot = target_slots[i]
+        local slot_disabled = slot.disabled
 
-            if slot_disabled then
-                break
-            end
-
+        if not slot_disabled then
             local slot_anchor_weight = slot.anchor_weight
 
-            if
-                best_anchor_weight < slot_anchor_weight
-                or (slot_anchor_weight == best_anchor_weight and slot.index < best_slot.index)
-            then
+            if best_anchor_weight < slot_anchor_weight or (slot_anchor_weight == best_anchor_weight and slot.index < best_slot.index) then
                 best_slot = slot
                 best_anchor_weight = slot_anchor_weight
             end
-        until true
+        end
+    end
+
+    -- Check if best_slot is still valid
+    if not best_slot then
+        mod:echo("Error: Unable to find a valid anchor slot for slot_type: " .. slot_type .. ", target_unit: " .. tostring(target_unit))
     end
 
     return best_slot
 end
+
 
 local function get_slot_queue_position(unit_extension_data, slot, nav_world, distance_modifier, t)
     local target_unit = slot.target_unit
