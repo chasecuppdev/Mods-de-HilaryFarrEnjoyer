@@ -1,6 +1,6 @@
 local mod = get_mod("slots")
 
--- luacheck: globals DebugDrawerRelease LineObject fassert Quaternion Color Matrix4x4 Actor Vector3 Unit script_data NavigationMesh class
+-- luacheck: globals DebugDrawerRelease LineObject fassert Quaternion Color Matrix4x4 Actor Vector3 Unit script_data NavigationMesh class stingray Managers
 
 DebugDrawerRelease = class(DebugDrawerRelease)
 
@@ -10,7 +10,11 @@ DebugDrawerRelease.init = function(self, line_object, mode)
 end
 
 DebugDrawerRelease.reset = function(self)
-    LineObject.reset(self._line_object)
+    if self._line_object and type(self._line_object) == "userdata" then
+        LineObject.reset(self._line_object)
+    else
+        mod:echo("LineObject reset failed: Invalid line object")
+    end
 end
 
 DebugDrawerRelease.line_object = function(self)
@@ -19,8 +23,11 @@ end
 
 DebugDrawerRelease.line = function(self, from, to, color)
     color = color or Color(255, 255, 255)
-
-    LineObject.add_line(self._line_object, color, from, to)
+    if self._line_object and type(self._line_object) == "userdata" then
+        LineObject.add_line(self._line_object, color, from, to)
+    else
+        mod:echo("LineObject add_line failed: Invalid line object")
+    end
 end
 
 DebugDrawerRelease.sphere = function(self, center, radius, color, segments, parts)
@@ -138,7 +145,7 @@ DebugDrawerRelease.cylinder = function(self, pos1, pos2, radius, color, segments
 
     LineObject.add_circle(self._line_object, color, pos1, radius, normal, 20)
 
-    for i = 1, segments - 1, 1 do
+    for i = 1, segments - 1, 1 do -- luacheck: ignore
         pos = pos + step
 
         LineObject.add_circle(self._line_object, color, pos, radius, normal, 20)
@@ -202,38 +209,36 @@ end
 DebugDrawerRelease.update = function(self, world)
     if script_data and script_data.disable_debug_draw then
         self:reset()
-
         return
     end
 
-    -- Debugging: Check the type of self._line_object and world
-    if type(self._line_object) ~= "userdata" then
-        mod:echo("Error: self._line_object is not userdata in DebugDrawerRelease:update")
+    if not self._line_object or type(self._line_object) ~= "userdata" then
+        mod:echo("Invalid line object in update")
         return
     end
 
-    if type(world) ~= "userdata" then
-        mod:echo("Error: world is not userdata in DebugDrawerRelease:update")
+    if not world or type(world) ~= "userdata" then
+        mod:echo("Invalid world in update")
         return
     end
 
-    -- Debugging: Check if world is of type World
-    if not rawget(_G, "World") or not World.is_world then
-        mod:echo("Error: World.is_world is not available")
+    mod:echo("Line object: " .. tostring(self._line_object))
+    mod:echo("World: " .. tostring(world))
+
+    local success, err = pcall(function()
+        mod:echo("Inside pcall before dispatch")
+        LineObject.dispatch(world, self._line_object)
+        mod:echo("Inside pcall after dispatch")
+    end)
+
+    if not success then
+        mod:echo("Error in LineObject.dispatch: " .. tostring(err))
         return
     end
-
-    -- Debugging: Check if world is of type World
-    if not World.is_world(world) then
-        mod:echo("Error: world is not of type World in DebugDrawerRelease:update")
-        return
-    end
-
-    LineObject.dispatch(world, self._line_object)
 
     if self._mode == "immediate" then
         self:reset()
     end
 end
 
-return DebugDrawerRelease
+return

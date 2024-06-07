@@ -1,61 +1,59 @@
 local mod = get_mod("slots")
 
-local AIPlayerSlotExtension = require("scripts/entity_system/systems/ai/ai_player_slot_extension")
+-- local function custom_create_target_slots(self, unit, num_slots, slot_type, color)
+--     self.slots = self.slots or {}
 
-local function custom_create_target_slots(self, unit, num_slots, slot_type, color)
-    self.slots = self.slots or {}
+--     local target_unit_str = tostring(unit)
+--     local nav_world = self.nav_world
 
-    local target_unit_str = tostring(unit)
-    local nav_world = self.nav_world
+--     if not nav_world then
+--         mod:echo("Error: nav_world is not initialized")
+--         return
+--     end
 
-    if not nav_world then
-        mod:echo("Error: nav_world is not initialized")
-        return
-    end
+--     local above = SLOT_Z_MAX_UP or 1
+--     local below = SLOT_Z_MAX_DOWN or 1
 
-    local above = SLOT_Z_MAX_UP or 1
-    local below = SLOT_Z_MAX_DOWN or 1
+--     mod:echo(string.format("Creating target slots for unit: %s", target_unit_str))
+--     mod:echo(string.format("Num slots: %d, Slot type: %s, Color: %s", num_slots, slot_type, color))
 
-    mod:echo(string.format("Creating target slots for unit: %s", target_unit_str))
-    mod:echo(string.format("Num slots: %d, Slot type: %s, Color: %s", num_slots, slot_type, color))
+--     for i = 1, num_slots do
+--         local slot_data = {
+--             slot_type = slot_type,
+--             color = color,
+--             position = nil,
+--             occupied = false,
+--             debug_color_name = color,
+--             attached_to_unit = nil,
+--             last_occupied_time = 0,
+--             full_slots_at_t = {},
+--             delayed_slot_decay_t = 0,
+--             has_slots_attached = true,
+--             delayed_num_occupied_slots = 0,
+--             moved_at = 0,
+--             next_slot_status_update_at = 0,
+--             dogpile = 0,
+--         }
 
-    for i = 1, num_slots do
-        local slot_data = {
-            slot_type = slot_type,
-            color = color,
-            position = nil,
-            occupied = false,
-            debug_color_name = color,
-            attached_to_unit = nil,
-            last_occupied_time = 0,
-            full_slots_at_t = {},
-            delayed_slot_decay_t = 0,
-            has_slots_attached = true,
-            delayed_num_occupied_slots = 0,
-            moved_at = 0,
-            next_slot_status_update_at = 0,
-            dogpile = 0,
-        }
+--         table.insert(self.slots, slot_data)
 
-        table.insert(self.slots, slot_data)
+--         local slot_direction = Vector3(1, 0, 0)  -- Replace with appropriate initial direction
+--         local distance = SlotTypeSettings[slot_type].distance
+--         local target_position = POSITION_LOOKUP[unit]
 
-        local slot_direction = Vector3(1, 0, 0)  -- Replace with appropriate initial direction
-        local distance = SlotTypeSettings[slot_type].distance
-        local target_position = POSITION_LOOKUP[unit]
+--         -- Call the function from the included file
+--         local position, _ = AIPlayerSlotExtension.get_slot_position_on_navmesh_from_outside_target(
+--             target_position, slot_direction, nil, distance, nav_world, above, below
+--         )
 
-        -- Call the function from the included file
-        local position, _ = AIPlayerSlotExtension.get_slot_position_on_navmesh_from_outside_target(
-            target_position, slot_direction, nil, distance, nav_world, above, below
-        )
-
-        if position then
-            slot_data.position = position
-            mod:echo(string.format("Slot %d for %s created with position (%f, %f, %f)", i, target_unit_str, position.x, position.y, position.z))
-        else
-            mod:echo(string.format("Failed to create slot %d for %s", i, target_unit_str))
-        end
-    end
-end
+--         if position then
+--             slot_data.position = position
+--             mod:echo(string.format("Slot %d for %s created with position (%f, %f, %f)", i, target_unit_str, position.x, position.y, position.z))
+--         else
+--             mod:echo(string.format("Failed to create slot %d for %s", i, target_unit_str))
+--         end
+--     end
+-- end
 
 local function custom_on_add_extension(self, world, unit, extension_name, extension_init_data)
     local extension = {}
@@ -133,13 +131,13 @@ local function custom_on_add_extension(self, world, unit, extension_name, extens
     return extension
 end
 
--- Hook into the existing functions
-mod:hook(AIPlayerSlotExtension, "_create_target_slots", function(func, self, ...)
+
+--[[ mod:hook(AIPlayerSlotExtension, "_create_target_slots", function(func, self, ...)
     log_argument_types_and_values(self, ...)
     return custom_create_target_slots(self, ...)
-end)
+end) ]]
 
-mod:hook(AISlotSystem, "on_add_extension", function(func, self, ...)
+--[[ mod:hook(AISlotSystem, "on_add_extension", function(func, self, ...)
     log_argument_types_and_values(self, ...)
     return custom_on_add_extension(self, ...)
-end)
+end) ]]

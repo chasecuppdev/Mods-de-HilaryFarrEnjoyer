@@ -1,6 +1,8 @@
-﻿return {
+﻿local mod = get_mod("slots")
+
+return {
 	normal = {
-		count = 18,
+		count = mod:get("normal_slots_count"),
 		debug_color = "lime",
 		dialogue_surrounded_count = 8,
 		distance = 1.85,
@@ -10,7 +12,7 @@
 		use_wait_slots = true,
 	},
 	medium = {
-		count = 16,
+		count = mod:get("medium_slots_count"),
 		debug_color = "yellow",
 		dialogue_surrounded_count = 6,
 		distance = 2.2,
@@ -20,7 +22,7 @@
 		use_wait_slots = true,
 	},
 	large = {
-		count = 8,
+		count = mod:get("large_slots_count"),
 		debug_color = "red",
 		dialogue_surrounded_count = 4,
 		distance = 2.25,

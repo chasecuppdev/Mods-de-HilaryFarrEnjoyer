@@ -1,0 +1,1 @@
+00:50:00.494 <<Lua Error>>...ts/entity_system/systems/ai/ai_player_slot_extension.lua:352: attempt to index local 'best_slot' (a nil value)<</Lua Error>>
