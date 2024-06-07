@@ -4,6 +4,7 @@ local menu = {
     name = "slots",
     description = mod:localize("mod_description"),
     is_togglable = true,
+    tooltip = "requires_restart",
     options = {
         widgets = {
             {

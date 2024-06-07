@@ -1,15 +1,15 @@
 local mod = get_mod("slots")
 
 mod:dofile("scripts/mods/slots/slots-logic/slot_helpers")
-mod:dofile("scripts/mods/slots/slots-logic/slot_hooks")
-mod:dofile("scripts/mods/slots/slots-logic/slot_functions")
 mod:dofile("scripts/mods/slots/debug-drawer/debug_drawer")
+mod:dofile("scripts/mods/slots/slots-logic/slot_functions")
 local debuggers = mod:dofile("scripts/mods/slots/slots-logic/ai_slot_system")
 local debug_draw_slots = debuggers.debug_draw_slots
 
 -- Disable debug mode by default
 local enabled = false
 
+-- Gotta restart the game to apply. Haven't figured out how to reinitialize the ai systems in game yet.
 local function apply_slot_settings()
     -- Reload custom slot settings
     package.loaded["scripts/mods/slots/custom-slot-settings/custom_slot_settings"] = nil
@@ -40,7 +40,7 @@ local function reinitialize_slot_systems()
     end
 end
 
-local function reinitialize_debugger()
+local function draw_slots()
     local entity_system = Managers.state.entity
     if enabled and entity_system then
         local ai_slot_system = entity_system:system("ai_slot_system")
@@ -57,20 +57,13 @@ end
 
 mod:hook_safe(Boot, "game_update", function(_, real_world_dt)
     if enabled then
-        reinitialize_debugger()
+        draw_slots()
     end
 end)
 
--- Apply settings on mod initialization and when settings change
-mod.on_all_mods_loaded = function()
-    apply_slot_settings()
-    reinitialize_slot_systems()
-end
-
 mod.on_setting_changed = function(setting_name)
     apply_slot_settings()
-    reinitialize_slot_systems()
-    reinitialize_debugger()
+    --reinitialize_slot_systems()
 end
 
 -- COMMANDS
@@ -79,6 +72,4 @@ mod:command("debug_slots", "Enable the Slot Debug UI", function()
 
     script_data.disable_debug_draw = not enabled
     Development._hardcoded_dev_params.disable_debug_draw = not enabled
-
-    reinitialize_debugger()
 end)

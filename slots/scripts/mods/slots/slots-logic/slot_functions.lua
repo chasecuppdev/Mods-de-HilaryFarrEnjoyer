@@ -340,7 +340,7 @@ AIPlayerSlotExtension.init = function (self, extension_init_context, unit, exten
 end
 
 
-AISlotSystem.init = function (self, context, system_name)
+--[[ AISlotSystem.init = function (self, context, system_name)
 	local entity_manager = context.entity_manager
 
 	entity_manager:register_system(self, system_name, AISlotSystem.extensions)
@@ -386,7 +386,7 @@ AISlotSystem.init = function (self, context, system_name)
 	self._traverse_logic = GwNavTraverseLogic.create(self.nav_world, nav_cost_map_cost_table)
 
 	GwNavTraverseLogic.set_navtag_layer_cost_table(self._traverse_logic, navtag_layer_cost_table)
-end
+end ]]
 
 AISlotSystem2.init = function (self, context, system_name)
     debug_print_table(SlotSettings, "SlotSettings at AISlotSystem.init")
