@@ -24,8 +24,6 @@ local function apply_slot_settings()
     table.merge_recursive(SlotTypeSettings, custom_slot_templates)
 
     mod:echo("Applied slot settings:")
-    debug_print_table(SlotSettings, "SlotSettings")
-    debug_print_table(SlotTypeSettings, "SlotTypeSettings")
 end
 
 local function reinitialize_slot_systems()

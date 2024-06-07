@@ -14,16 +14,8 @@ assert(type(custom_slot_templates) == "table", "Expected custom_slot_templates t
 SlotSettings = SlotSettings or {}
 SlotTypeSettings = SlotTypeSettings or {}
 
-mod:echo("Before merging:")
-debug_print_table(SlotSettings, "SlotSettings")
-debug_print_table(SlotTypeSettings, "SlotTypeSettings")
-
 table.merge_recursive(SlotSettings, custom_slot_settings)
 table.merge_recursive(SlotTypeSettings, custom_slot_templates)
-
-mod:echo("After merging:")
-debug_print_table(SlotSettings, "SlotSettings")
-debug_print_table(SlotTypeSettings, "SlotTypeSettings")
 
 print("[slots] SlotSettings and SlotTemplates overridden successfully")
 
@@ -280,8 +272,8 @@ AIPlayerSlotExtension.init = function (self, extension_init_context, unit, exten
 
     -- Loop through slot types and initialize slots
     for slot_type, setting in pairs(SlotTypeSettings) do
-        mod:echo("Initializing slots for slot type: " .. slot_type)
-        mod:echo("Settings: " .. tostring(setting))
+--[[         mod:echo("Initializing slots for slot type: " .. slot_type)
+        mod:echo("Settings: " .. tostring(setting)) ]]
 
         local unit_data_var_name = slot_type == "normal" and "ai_slots_count" or "ai_slots_count_" .. slot_type
         local total_slots_count = setting.count
@@ -297,9 +289,9 @@ AIPlayerSlotExtension.init = function (self, extension_init_context, unit, exten
 
         self.all_slots[slot_type] = slot_data
 
-        -- Log the slot data
+--[[         -- Log the slot data
         mod:echo(string.format("Slot data for %s: total_slots_count = %d, slot_radians = %.2f, use_wait_slots = %s, priority = %d", 
-            slot_type, total_slots_count, slot_data.slot_radians, tostring(slot_data.use_wait_slots), slot_data.priority))
+            slot_type, total_slots_count, slot_data.slot_radians, tostring(slot_data.use_wait_slots), slot_data.priority)) ]]
     end
 
     -- Log after all slots have been initialized
@@ -388,7 +380,7 @@ end
 	GwNavTraverseLogic.set_navtag_layer_cost_table(self._traverse_logic, navtag_layer_cost_table)
 end ]]
 
-AISlotSystem2.init = function (self, context, system_name)
+--[[ AISlotSystem2.init = function (self, context, system_name)
     debug_print_table(SlotSettings, "SlotSettings at AISlotSystem.init")
     debug_print_table(SlotTypeSettings, "SlotTypeSettings at AISlotSystem.init")
 	AISlotSystem2.super.init(self, context, system_name, AISlotSystem2.extensions)
@@ -430,4 +422,4 @@ AISlotSystem2.init = function (self, context, system_name)
 	self._traverse_logic = GwNavTraverseLogic.create(self.nav_world, nav_cost_map_cost_table)
 
 	GwNavTraverseLogic.set_navtag_layer_cost_table(self._traverse_logic, navtag_layer_cost_table)
-end
+end ]]
